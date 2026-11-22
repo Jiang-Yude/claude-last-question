@@ -1,0 +1,11 @@
+{
+  "name": "claude-last-question",
+  "owner": { "name": "Jiang-Yude" },
+  "plugins": [
+    {
+      "name": "last-question",
+      "source": "./",
+      "description": "在輸入框上方固定顯示你上一個問題、送出多久了、上下文已使用幾%"
+    }
+  ]
+}
