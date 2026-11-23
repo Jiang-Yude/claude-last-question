@@ -16,6 +16,40 @@ function oneLine(text: string): string {
   return chars.length > MAX ? chars.slice(0, MAX).join('') + '…' : flat
 }
 
+// 已使用幾% 的圓圈顏色：20 以內淺綠、50 以內深綠、未滿 70 黃、70 以上紅
+function usedColor(pct: number): string {
+  if (pct <= 20) return '#86EFAC'
+  if (pct <= 50) return '#16A34A'
+  if (pct < 70) return '#FACC15'
+  return '#EF4444'
+}
+
+// 灰底圓餅：整圈灰色，已使用的比例從 12 點鐘方向順時針填上顏色
+function pieSvg(pct: number, color: string, label: string): string {
+  const r = 7
+  const p = Math.min(100, Math.max(0, pct))
+  const bg = `<circle cx="${r}" cy="${r}" r="${r}" fill="#9CA3AF" fill-opacity="0.45"/>`
+  let fg = ''
+  if (p >= 100) {
+    fg = `<circle cx="${r}" cy="${r}" r="${r}" fill="${color}"/>`
+  } else if (p > 0) {
+    const a = (p / 100) * 2 * Math.PI
+    const x = (r + r * Math.sin(a)).toFixed(2)
+    const y = (r - r * Math.cos(a)).toFixed(2)
+    fg = `<path d="M${r} ${r} L${r} 0 A${r} ${r} 0 ${p > 50 ? 1 : 0} 1 ${x} ${y} Z" fill="${color}"/>`
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${2 * r}" height="${2 * r}" viewBox="0 0 ${2 * r} ${2 * r}"><title>${label}</title>${bg}${fg}</svg>`
+}
+
+// 終端機畫不了 SVG，用字元圓餅代替
+function pieGlyph(pct: number): string {
+  if (pct < 12.5) return '○'
+  if (pct < 37.5) return '◔'
+  if (pct < 62.5) return '◑'
+  if (pct < 87.5) return '◕'
+  return '●'
+}
+
 function ago(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000))
   if (s < 60) return '剛剛'
@@ -73,12 +107,28 @@ export const register: Register = on => {
     }
     const tick = await read($, now)
     const pct = await read($, used)
-    const usedText = pct === null ? '' : `・已使用 ${pct}%`
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Button, Text } = ui
+    const time = ago(Math.max(tick, q.at) - q.at)
+
+    let usage = null
+    if (pct !== null) {
+      const color = usedColor(pct)
+      const alt = `上下文已使用 ${pct}%`
+      // 前面的時間已經是數字，這裡只畫圓圈，用顏色區分；滑鼠移上去看得到幾%
+      usage =
+        e.surface !== 'terminal' && 'Svg' in ui ? (
+          <ui.Svg source={pieSvg(pct, color, alt)} alt={alt} width={14} height={14} isInteractive />
+        ) : (
+          <Text color={color}>{pieGlyph(pct)}</Text>
+        )
+    }
 
     return (
       <Box>
-        <Text dimColor>上一題（{ago(Math.max(tick, q.at) - q.at)}{usedText}）：</Text>
+        <Text dimColor>上一題（{time}{pct === null ? '）：' : '・'}</Text>
+        {usage}
+        {pct === null ? null : <Text dimColor>）：</Text>}
         <Text>{q.text} </Text>
         <Button key="hide" label="收起" onPress={() => update($, isHidden, () => true)} />
       </Box>
